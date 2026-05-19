@@ -1,10 +1,9 @@
-import type { Client, KnowledgeBase, Lead, Message } from "@/types";
+import type { Client, KnowledgeBase, Lead } from "@/types";
 import { getClientConfig } from "@/lib/config";
 
 interface BuildPromptArgs {
   client: Client;
   lead: Lead;
-  messages: Message[];
   knowledgeBase: KnowledgeBase[];
 }
 
@@ -47,11 +46,8 @@ function formatQuestions(questions: string[]): string {
 export function buildPrompt({
   client,
   lead,
-  messages,
   knowledgeBase,
 }: BuildPromptArgs): string {
-  void messages;
-
   const config = getClientConfig(client.config);
   const language = getLanguage(client);
   const promptSections: string[] = [

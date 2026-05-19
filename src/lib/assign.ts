@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getClientConfig } from "@/lib/config";
-import type { Agent, Client, Lead } from "@/types";
+import type { Agent, Client, Lead, RoutingType } from "@/types";
 
 interface AssignLeadArgs {
   lead: Lead;
@@ -34,14 +34,17 @@ function sortByLoad(agents: Agent[]): Agent[] {
   return [...agents].sort((left, right) => left.active_leads - right.active_leads);
 }
 
+const ASSIGNMENT_ROUTING_TYPES: RoutingType[] = ["agent_assignment", "round_robin"];
+
 export async function assignLead({
   lead,
   client,
   supabase,
 }: AssignLeadArgs): Promise<Agent | null> {
   const config = getClientConfig(client.config);
+  const routingType = config.routing?.type;
 
-  if (config.routing?.type !== "agent_assignment") {
+  if (!routingType || !ASSIGNMENT_ROUTING_TYPES.includes(routingType)) {
     return null;
   }
 
@@ -92,10 +95,14 @@ export async function assignLead({
   }
 
   const sortedAgents = sortByLoad(pool);
+  // round_robin: purely sequential, ignores score and load
+  // agent_assignment: hot leads (>85) get the least busy agent; others round-robin
   const assignedAgent =
-    lead.score > 85
-      ? sortedAgents[0]
-      : sortedAgents[Math.floor(Date.now() / 1000) % sortedAgents.length];
+    routingType === "round_robin"
+      ? sortedAgents[Math.floor(Date.now() / 1000) % sortedAgents.length]
+      : lead.score > 85
+        ? sortedAgents[0]
+        : sortedAgents[Math.floor(Date.now() / 1000) % sortedAgents.length];
 
   const assignedAt = new Date().toISOString();
 

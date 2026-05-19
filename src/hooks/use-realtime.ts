@@ -158,6 +158,7 @@ function parseRealtimeLead(value: unknown): Lead | null {
     assigned_at: asNullableString(value.assigned_at),
     first_seen: value.first_seen,
     last_active: value.last_active,
+    ai_paused: value.ai_paused === true,
   };
 }
 

@@ -11,6 +11,6 @@ export async function POST(request: Request) {
   return handleMetaWebhook({
     request,
     platform: "whatsapp",
-    normalise: (payload) => normaliseWhatsApp(payload),
+    normalise: normaliseWhatsApp,
   });
 }

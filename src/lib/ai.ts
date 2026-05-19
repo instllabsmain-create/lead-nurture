@@ -74,7 +74,7 @@ export async function generateReply({
   client,
   knowledgeBase,
 }: GenerateReplyArgs): Promise<string> {
-  const systemPrompt = buildPrompt({ client, lead, messages, knowledgeBase });
+  const systemPrompt = buildPrompt({ client, lead, knowledgeBase });
   const config = getClientConfig(client.config);
 
   const history: OpenRouterRequestMessage[] = messages

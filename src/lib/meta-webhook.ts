@@ -12,7 +12,7 @@ type MetaPlatform = Extract<Platform, "instagram" | "whatsapp" | "facebook">;
 interface HandleMetaWebhookArgs {
   request: Request;
   platform: MetaPlatform;
-  normalise: (payload: unknown) => NormalisedMessage;
+  normalise: (payload: unknown) => NormalisedMessage[];
 }
 
 function getSafeErrorMessage(error: unknown): string {
@@ -118,25 +118,29 @@ export async function handleMetaWebhook({
 
   try {
     const payload = JSON.parse(rawBody) as unknown;
-    const normalised = normalise(payload);
-    const clientId = await findChannelClientId(normalised.to.id, platform);
+    const normalisedMessages = normalise(payload);
 
-    if (!clientId) {
-      console.error(`Channel not found for ${platform} account ${normalised.to.id}`);
+    if (normalisedMessages.length === 0) {
       return Response.json({ ok: true });
     }
 
-    const message = {
-      ...normalised,
-      client_id: clientId,
-    };
-
     waitUntil(
-      forwardToMessageRoute(request, message).catch((error: unknown) => {
-        console.error(
-          `Failed to forward ${platform} webhook: ${getSafeErrorMessage(error)}`,
-        );
-      }),
+      Promise.all(
+        normalisedMessages.map(async (normalised) => {
+          try {
+            const clientId = await findChannelClientId(normalised.to.id, platform);
+
+            if (!clientId) {
+              console.error(`Channel not found for ${platform} account ${normalised.to.id}`);
+              return;
+            }
+
+            await forwardToMessageRoute(request, { ...normalised, client_id: clientId });
+          } catch (error) {
+            console.error(`Failed to forward ${platform} message: ${getSafeErrorMessage(error)}`);
+          }
+        }),
+      ),
     );
 
     return Response.json({ ok: true });

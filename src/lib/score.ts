@@ -89,15 +89,24 @@ export async function scoreLead({
     }
   }
 
-  if (BUYING_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+  // Signal flags are stored in answers under reserved keys so they persist across messages
+  // without requiring a separate DB column. They fire at most once per conversation.
+  const BUYING_KEY = "__signal_buying";
+  const URGENCY_KEY = "__signal_urgency";
+  const NEGATIVE_KEY = "__signal_negative";
+
+  if (!answers[BUYING_KEY] && BUYING_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+    answers[BUYING_KEY] = "1";
     score += weights.buying_signal ?? 0;
   }
 
-  if (URGENCY_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+  if (!answers[URGENCY_KEY] && URGENCY_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+    answers[URGENCY_KEY] = "1";
     score += weights.urgency_signal ?? 0;
   }
 
-  if (NEGATIVE_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+  if (!answers[NEGATIVE_KEY] && NEGATIVE_SIGNALS.some((signal) => normalizedText.includes(signal))) {
+    answers[NEGATIVE_KEY] = "1";
     score += weights.negative_signal ?? 0;
   }
 

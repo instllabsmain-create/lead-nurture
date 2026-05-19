@@ -255,17 +255,19 @@ async function processMessage({
 
     let reply: string | null = null;
 
-    try {
-      const generatedReply = await generateReply({
-        lead,
-        messages,
-        client,
-        knowledgeBase,
-      });
+    if (!lead.ai_paused) {
+      try {
+        const generatedReply = await generateReply({
+          lead,
+          messages,
+          client,
+          knowledgeBase,
+        });
 
-      reply = generatedReply.trim().length > 0 ? generatedReply.trim() : null;
-    } catch (error) {
-      console.error(`AI reply generation failed: ${getSafeErrorMessage(error)}`);
+        reply = generatedReply.trim().length > 0 ? generatedReply.trim() : null;
+      } catch (error) {
+        console.error(`AI reply generation failed: ${getSafeErrorMessage(error)}`);
+      }
     }
 
     if (reply) {
@@ -320,7 +322,7 @@ async function processMessage({
     if (updatedLead.score >= routingThreshold) {
       const routingType = getClientConfig(client.config).routing?.type;
 
-      if (routingType === "agent_assignment" && !updatedLead.assigned_agent_id) {
+      if ((routingType === "agent_assignment" || routingType === "round_robin") && !updatedLead.assigned_agent_id) {
         try {
           const agent = await assignLead({
             lead: updatedLead,

@@ -34,6 +34,7 @@ interface LeadLookupRow {
   status: LeadStatus;
   assigned_agent_id: string | null;
   last_active: string;
+  ai_paused: boolean;
 }
 
 function getConversationName(
@@ -126,7 +127,7 @@ export function useConversations({
     const { data } = await supabase
       .from("leads")
       .select(
-        "id, client_id, name, handle, score, status, assigned_agent_id, last_active",
+        "id, client_id, name, handle, score, status, assigned_agent_id, last_active, ai_paused",
       )
       .eq("client_id", clientId)
       .eq("id", message.lead_id)
@@ -163,6 +164,7 @@ export function useConversations({
         assignedAgentId: lead.assigned_agent_id,
         lastActive: lead.last_active,
         channel: current?.channel ?? message.channel,
+        aiPaused: (lead as LeadLookupRow).ai_paused ?? current?.aiPaused ?? false,
       }));
     }
   }
@@ -249,6 +251,7 @@ export function useConversations({
         assignedAgentId: lead.assigned_agent_id,
         lastActive: lead.last_active,
         channel: current?.channel ?? null,
+        aiPaused: lead.ai_paused,
       }));
     }
   }

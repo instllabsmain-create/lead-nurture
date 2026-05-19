@@ -11,6 +11,6 @@ export async function POST(request: Request) {
   return handleMetaWebhook({
     request,
     platform: "facebook",
-    normalise: (payload) => normaliseFacebook(payload),
+    normalise: normaliseFacebook,
   });
 }

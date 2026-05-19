@@ -135,10 +135,12 @@ export async function scheduleFollowUp(
     const publishResult = await qstash.publishJSON({
       url: `${appUrl}/api/followup`,
       delay: args.delaySeconds,
+      deduplicationId: followUp.id,
       body: {
         leadId: args.leadId,
         clientId: args.clientId,
         message: args.message,
+        followUpId: followUp.id,
       },
     });
 

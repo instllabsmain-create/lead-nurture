@@ -114,6 +114,7 @@ export interface Lead {
   assigned_at: string | null;
   first_seen: string;
   last_active: string;
+  ai_paused: boolean;
 }
 
 export interface MessageContent {

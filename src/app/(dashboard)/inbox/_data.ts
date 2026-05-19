@@ -40,6 +40,7 @@ interface ConversationLeadRow {
   status: Lead["status"];
   assigned_agent_id: string | null;
   last_active: string;
+  ai_paused: boolean;
 }
 
 interface ConversationMessageRow {
@@ -67,7 +68,7 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
   const { data: leadsData } = await supabase
     .from("leads")
     .select(
-      "id, client_id, channel_id, name, handle, score, status, assigned_agent_id, last_active",
+      "id, client_id, channel_id, name, handle, score, status, assigned_agent_id, last_active, ai_paused",
     )
     .eq("client_id", client.id)
     .order("last_active", { ascending: false });
@@ -170,6 +171,7 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
       assignedAgentId: selectedLead.assigned_agent_id,
       lastActive: selectedLead.last_active,
       channel: selectedChannel,
+      aiPaused: selectedLead.ai_paused,
     },
     messages: ((selectedMessagesData ?? []) as Pick<
       Message,

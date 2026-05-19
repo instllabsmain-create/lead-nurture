@@ -14,6 +14,7 @@ export interface ConversationThreadLead {
   assignedAgentId: string | null;
   lastActive: string;
   channel: Platform | null;
+  aiPaused: boolean;
 }
 
 export interface ConversationThreadMessage {
@@ -115,10 +116,6 @@ export function ConversationThread({
 }: ConversationThreadProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const latestMessage = messages[messages.length - 1];
-  const defaultAiHandling =
-    !latestMessage
-    || latestMessage.direction === "inbound"
-    || latestMessage.aiGenerated;
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -222,9 +219,9 @@ export function ConversationThread({
       <div className="border-t border-border bg-white p-4 lg:p-5">
         <div className="mx-auto w-full max-w-3xl">
           <MessageInput
-            key={`${lead.id}:${latestMessage?.id ?? "empty"}:${defaultAiHandling ? "ai" : "human"}`}
+            key={`${lead.id}:${latestMessage?.id ?? "empty"}`}
             leadId={lead.id}
-            defaultAiHandling={defaultAiHandling}
+            aiPaused={lead.aiPaused}
           />
         </div>
       </div>

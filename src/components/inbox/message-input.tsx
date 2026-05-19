@@ -7,7 +7,7 @@ import { buttonClassNames } from "@/components/ui/button";
 
 interface MessageInputProps {
   leadId: string;
-  defaultAiHandling: boolean;
+  aiPaused: boolean;
 }
 
 interface SendMessageRequest {
@@ -15,12 +15,9 @@ interface SendMessageRequest {
   message: string;
 }
 
-interface SendMessageSuccessResponse {
-  ok: true;
-}
-
-interface SendMessageErrorResponse {
-  error: string;
+interface AiControlRequest {
+  leadId: string;
+  paused: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,7 +26,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseSendResponse(
   payload: unknown,
-): SendMessageSuccessResponse | SendMessageErrorResponse {
+): { ok: true } | { error: string } {
   if (isRecord(payload) && payload.ok === true) {
     return { ok: true };
   }
@@ -41,14 +38,36 @@ function parseSendResponse(
   return { error: "Unexpected response from server" };
 }
 
-export function MessageInput({
-  leadId,
-  defaultAiHandling,
-}: MessageInputProps) {
+export function MessageInput({ leadId, aiPaused }: MessageInputProps) {
   const [draft, setDraft] = useState("");
-  const [isAiHandling, setIsAiHandling] = useState(defaultAiHandling);
+  const [isAiHandling, setIsAiHandling] = useState(!aiPaused);
   const [isSending, setIsSending] = useState(false);
+  const [isTogglingAi, setIsTogglingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function toggleAi(paused: boolean) {
+    setIsTogglingAi(true);
+    setError(null);
+
+    try {
+      const payload: AiControlRequest = { leadId, paused };
+      const response = await fetch("/api/ai-control", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update AI mode");
+      }
+
+      setIsAiHandling(!paused);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update AI mode");
+    } finally {
+      setIsTogglingAi(false);
+    }
+  }
 
   async function sendMessage() {
     const trimmed = draft.trim();
@@ -61,32 +80,22 @@ export function MessageInput({
     setError(null);
 
     try {
-      const payload: SendMessageRequest = {
-        leadId,
-        message: trimmed,
-      };
-
+      const payload: SendMessageRequest = { leadId, message: trimmed };
       const response = await fetch("/api/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const result = parseSendResponse((await response.json()) as unknown);
 
       if (!response.ok) {
-        throw new Error(
-          "error" in result ? result.error : "Failed to send message",
-        );
+        throw new Error("error" in result ? result.error : "Failed to send message");
       }
 
       setDraft("");
     } catch (sendError) {
-      setError(
-        sendError instanceof Error ? sendError.message : "Failed to send message",
-      );
+      setError(sendError instanceof Error ? sendError.message : "Failed to send message");
     } finally {
       setIsSending(false);
     }
@@ -111,18 +120,20 @@ export function MessageInput({
         {isAiHandling ? (
           <button
             type="button"
+            disabled={isTogglingAi}
             className={buttonClassNames.ghost}
-            onClick={() => setIsAiHandling(false)}
+            onClick={() => void toggleAi(true)}
           >
-            Take over from AI
+            {isTogglingAi ? "Updating..." : "Take over from AI"}
           </button>
         ) : (
           <button
             type="button"
+            disabled={isTogglingAi}
             className={buttonClassNames.secondary}
-            onClick={() => setIsAiHandling(true)}
+            onClick={() => void toggleAi(false)}
           >
-            Hand back to AI
+            {isTogglingAi ? "Updating..." : "Hand back to AI"}
           </button>
         )}
       </div>
@@ -147,9 +158,7 @@ export function MessageInput({
 
           <button
             type="button"
-            onClick={() => {
-              void sendMessage();
-            }}
+            onClick={() => { void sendMessage(); }}
             disabled={isDisabled || draft.trim().length === 0}
             className={buttonClassNames.primary}
           >
