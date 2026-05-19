@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email: demoEmail,
       token: linkData.properties.email_otp,
-      type: "magiclink",
+      type: "email",
     });
 
     if (verifyError) {
