@@ -1,12 +1,38 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+
+function parseHashError(): string | null {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.slice(1)
+  const params = new URLSearchParams(hash)
+  const code = params.get('error_code')
+  const description = params.get('error_description')
+  if (!code) return null
+  if (code === 'otp_expired') return 'That login link has expired. Sign in with your email and password below.'
+  return description ?? 'Something went wrong. Please sign in again.'
+}
 
 function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/dashboard'
-  const error = searchParams.get('error')
+  const queryError = searchParams.get('error')
+
+  const [hashError, setHashError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const msg = parseHashError()
+    if (msg) {
+      setHashError(msg)
+      // Clean the hash so it doesn't persist on refresh
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
+
+  const errorMessage =
+    hashError ??
+    (queryError === 'invalid' ? 'Invalid email or password.' : null)
 
   return (
     <div className="min-h-[100dvh] bg-parchment flex items-center justify-center px-6">
@@ -58,9 +84,9 @@ function LoginForm() {
               className="w-full px-3.5 py-2.5 font-body text-sm text-pitch bg-white border border-border rounded-md outline-none focus:ring-2 focus:ring-saffron/20 focus:border-saffron placeholder:text-dust transition-all"
               placeholder="••••••••••••••••"
             />
-            {error === 'invalid' && (
+            {errorMessage && (
               <p className="font-mono text-xs text-red-500 mt-1">
-                Invalid email or password.
+                {errorMessage}
               </p>
             )}
           </div>
