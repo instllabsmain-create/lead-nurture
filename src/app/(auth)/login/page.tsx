@@ -18,22 +18,40 @@ function LoginForm() {
           SIGN IN.
         </h1>
         <p className="font-body text-sm text-dust mb-8">
-          Enter your access token to continue.
+          Enter your credentials to continue.
         </p>
 
-        <form action="/auth/demo" method="POST" className="flex flex-col gap-4">
+        <form action="/auth/login" method="POST" className="flex flex-col gap-4">
           <input type="hidden" name="next" value={next} />
 
           <div>
             <label
-              htmlFor="token"
+              htmlFor="email"
               className="block font-mono text-[9px] uppercase tracking-[2.5px] text-dust mb-1.5"
             >
-              Access token
+              Email
             </label>
             <input
-              id="token"
-              name="token"
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className="w-full px-3.5 py-2.5 font-body text-sm text-pitch bg-white border border-border rounded-md outline-none focus:ring-2 focus:ring-saffron/20 focus:border-saffron placeholder:text-dust transition-all"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block font-mono text-[9px] uppercase tracking-[2.5px] text-dust mb-1.5"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
               type="password"
               autoComplete="current-password"
               required
@@ -42,7 +60,7 @@ function LoginForm() {
             />
             {error === 'invalid' && (
               <p className="font-mono text-xs text-red-500 mt-1">
-                Invalid access token.
+                Invalid email or password.
               </p>
             )}
           </div>
