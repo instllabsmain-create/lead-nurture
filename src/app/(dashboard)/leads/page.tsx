@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { LeadCard } from "@/components/leads/lead-card";
 import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { createClient } from "@/lib/supabase/server";
+import { getActiveClientContext } from "@/lib/active-client";
 import type { LeadStatus, MessageContent, Platform } from "@/types";
 
 type StatusFilter = LeadStatus | "all";
@@ -17,10 +16,6 @@ interface LeadsPageProps {
     score?: string;
     assignment?: string;
   }>;
-}
-
-interface ClientRow {
-  id: string;
 }
 
 interface LeadRow {
@@ -144,26 +139,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const statusFilter = parseStatusFilter(filtersFromSearch.status);
   const scoreFilter = parseScoreBandFilter(filtersFromSearch.score);
   const assignmentFilter = parseAssignmentFilter(filtersFromSearch.assignment);
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: clientData } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = (clientData as ClientRow | null) ?? null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   let leadsQuery = supabase
     .from("leads")

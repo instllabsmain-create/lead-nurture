@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { sendViaChannel } from "@/lib/channels";
-import { createClient } from "@/lib/supabase/server";
-import type { Channel, Client, Lead } from "@/types";
+import { getActiveClientContext } from "@/lib/active-client";
+import type { Channel, Lead } from "@/types";
 
 const sendMessageSchema = z.object({
   leadId: z.uuid(),
@@ -17,28 +17,8 @@ function getSafeErrorMessage(error: unknown): string {
   return "Unknown error";
 }
 
-async function loadCurrentClient(
-  userId: string,
-): Promise<{ supabase: Awaited<ReturnType<typeof createClient>>; client: Client | null }> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Failed to load client: ${error.message}`);
-  }
-
-  return {
-    supabase,
-    client: (data as Client | null) ?? null,
-  };
-}
-
 async function loadLead(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"],
   leadId: string,
   clientId: string,
 ): Promise<Lead | null> {
@@ -57,7 +37,7 @@ async function loadLead(
 }
 
 async function loadChannel(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"],
   lead: Lead,
   clientId: string,
 ): Promise<Channel | null> {
@@ -80,7 +60,7 @@ async function loadChannel(
 }
 
 async function saveOutboundMessage(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"],
   clientId: string,
   leadId: string,
   channelType: Channel["type"],
@@ -106,7 +86,7 @@ async function saveOutboundMessage(
 }
 
 async function updateLeadLastActive(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"],
   leadId: string,
   clientId: string,
   timestamp: string,
@@ -126,31 +106,12 @@ async function updateLeadLastActive(
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) {
-      console.error(`Failed to read auth session: ${userError.message}`);
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { supabase, client } = await getActiveClientContext();
 
     const body = sendMessageSchema.safeParse((await request.json()) as unknown);
 
     if (!body.success) {
       return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    const { client } = await loadCurrentClient(user.id);
-
-    if (!client) {
-      return Response.json({ error: "Client not found" }, { status: 404 });
     }
 
     const lead = await loadLead(supabase, body.data.leadId, client.id);

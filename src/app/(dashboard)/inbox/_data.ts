@@ -2,8 +2,8 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
-import type { Client, Lead, Message, MessageContent, Platform } from "@/types";
+import { getActiveClientContext } from "@/lib/active-client";
+import type { Lead, Message, MessageContent, Platform } from "@/types";
 
 function getMessagePreview(content: MessageContent | null): string {
   if (!content) {
@@ -62,26 +62,7 @@ interface LoadInboxDataArgs {
 }
 
 export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: clientData } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = clientData as Client | null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   const { data: leadsData } = await supabase
     .from("leads")

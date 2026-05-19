@@ -1,15 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { createClient } from "@/lib/supabase/server";
+import { getActiveClientContext } from "@/lib/active-client";
 import type { LeadStatus, MessageContent, Platform } from "@/types";
-
-interface ClientRow {
-  id: string;
-  name: string;
-}
 
 interface RecentLeadRow {
   id: string;
@@ -154,26 +148,7 @@ function getMessagePreview(content: MessageContent | null): string {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: clientData } = await supabase
-    .from("clients")
-    .select("id, name")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = clientData as ClientRow | null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);

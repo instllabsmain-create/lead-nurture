@@ -1,22 +1,18 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import {
   LeadDetail,
   type LeadDetailMessage,
 } from "@/components/leads/lead-detail";
 import { SectionLabel } from "@/components/ui/section-label";
-import { createClient } from "@/lib/supabase/server";
+import { getActiveClientContext } from "@/lib/active-client";
 import type { Lead, Message, Platform } from "@/types";
 
 interface LeadPageProps {
   params: Promise<{
     id: string;
   }>;
-}
-
-interface ClientRow {
-  id: string;
 }
 
 interface AgentRow {
@@ -31,26 +27,7 @@ type MessageRow = Pick<
 
 export default async function LeadPage({ params }: LeadPageProps) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: clientData } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = (clientData as ClientRow | null) ?? null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   const { data: leadData } = await supabase
     .from("leads")

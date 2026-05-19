@@ -1,12 +1,11 @@
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { buttonClassNames } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
+import { getActiveClientContext } from "@/lib/active-client";
 import { DEFAULT_CONFIG, getClientConfig } from "@/lib/config";
-import { createClient } from "@/lib/supabase/server";
 import type {
   AILanguage,
   Client,
@@ -108,33 +107,19 @@ function getFallbackLabel(value: RoutingFallback): string {
 }
 
 async function loadClientContext(): Promise<{
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"];
   client: ClientRow;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data } = await supabase
-    .from("clients")
-    .select("id, user_id, name, config")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = (data as ClientRow | null) ?? null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   return {
     supabase,
-    client,
+    client: {
+      id: client.id,
+      user_id: client.user_id,
+      name: client.name,
+      config: client.config,
+    },
   };
 }
 
@@ -204,8 +189,7 @@ async function saveSettingsAction(formData: FormData) {
       name: payload.data.businessName,
       config: nextConfig,
     })
-    .eq("id", client.id)
-    .eq("user_id", client.user_id);
+    .eq("id", client.id);
 
   if (error) {
     throw new Error(`Failed to save settings: ${error.message}`);

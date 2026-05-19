@@ -1,17 +1,12 @@
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { CopyButton } from "@/components/channels/copy-button";
 import { buttonClassNames } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { createClient } from "@/lib/supabase/server";
+import { getActiveClientContext } from "@/lib/active-client";
 import type { Channel, Platform } from "@/types";
-
-interface ClientRow {
-  id: string;
-}
 
 type ChannelRow = Pick<
   Channel,
@@ -78,29 +73,10 @@ function getStatusLabel(status: Channel["status"] | "ready"): string {
 }
 
 async function loadClientContext(): Promise<{
-  supabase: Awaited<ReturnType<typeof createClient>>;
+  supabase: Awaited<ReturnType<typeof getActiveClientContext>>["supabase"];
   clientId: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: clientData } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const client = (clientData as ClientRow | null) ?? null;
-
-  if (!client) {
-    redirect("/onboarding");
-  }
+  const { supabase, client } = await getActiveClientContext();
 
   return {
     supabase,
