@@ -237,7 +237,7 @@ export function useConversations({
         status: lead.status,
         assignedAgentId: lead.assigned_agent_id,
         lastActive: lead.last_active,
-        unread: lead.status === "new",
+        unread: existing.unread || lead.status === "new",
       });
     });
 

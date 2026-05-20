@@ -116,6 +116,7 @@ export function ConversationThread({
 }: ConversationThreadProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const latestMessage = messages[messages.length - 1];
+  const lastMessageId = latestMessage?.id;
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -124,8 +125,13 @@ export function ConversationThread({
       return;
     }
 
-    container.scrollTop = container.scrollHeight;
-  }, [messages]);
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    if (distanceFromBottom < 120) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [lastMessageId]);
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-parchment">

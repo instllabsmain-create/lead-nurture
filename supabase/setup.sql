@@ -177,6 +177,7 @@ create index if not exists idx_messages_lead_time    on public.messages(lead_id,
 create index if not exists idx_messages_client_dir   on public.messages(client_id, direction, sent_at desc);
 create index if not exists idx_followups_scheduled   on public.follow_ups(scheduled_at) where sent = false;
 create index if not exists idx_channels_account      on public.channels(account_id, type);
+create index if not exists idx_leads_agent           on public.leads(client_id, assigned_agent_id) where assigned_agent_id is not null;
 
 -- ── WAITLIST (marketing site) ─────────────────────────────────────────────────
 create table if not exists public.waitlist (
