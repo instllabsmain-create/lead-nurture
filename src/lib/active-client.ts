@@ -30,6 +30,12 @@ interface ClerkIdentity {
   userId: string;
 }
 
+interface ClerkSessionIdentity {
+  email: string | null;
+  name: string | null;
+  userId: string;
+}
+
 function getConfiguredClientId(): string {
   return (
     process.env.APP_CLIENT_ID?.trim()
@@ -48,6 +54,29 @@ function getDefaultClientEmail(): string {
 
 function normaliseEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStringClaim(
+  claims: Record<string, unknown> | null,
+  keys: string[],
+): string | null {
+  if (!claims) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = claims[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
 }
 
 function getAuthorizedClerkEmails(): string[] {
@@ -122,11 +151,47 @@ function getDisplayName(
   return fullName || user.username || email;
 }
 
-async function getClerkIdentity(): Promise<ClerkIdentity> {
-  const { userId } = await auth();
+function getDisplayNameFromClaims(
+  claims: Record<string, unknown> | null,
+): string | null {
+  const name = getStringClaim(claims, ["name", "full_name", "username"]);
+
+  if (name) {
+    return name;
+  }
+
+  const firstName = getStringClaim(claims, ["first_name", "given_name"]);
+  const lastName = getStringClaim(claims, ["last_name", "family_name"]);
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return fullName || null;
+}
+
+async function getClerkSessionIdentity(): Promise<ClerkSessionIdentity> {
+  const { userId, sessionClaims } = await auth();
 
   if (!userId) {
     throw new Error("Unauthorized");
+  }
+
+  const claims = isRecord(sessionClaims) ? sessionClaims : null;
+
+  return {
+    email: getStringClaim(claims, ["email", "email_address", "primary_email_address"]),
+    name: getDisplayNameFromClaims(claims),
+    userId,
+  };
+}
+
+async function getProvisioningIdentity(
+  identity: ClerkSessionIdentity,
+): Promise<ClerkIdentity> {
+  if (identity.email) {
+    return {
+      email: identity.email,
+      name: identity.name || identity.email,
+      userId: identity.userId,
+    };
   }
 
   const user = await currentUser();
@@ -139,7 +204,7 @@ async function getClerkIdentity(): Promise<ClerkIdentity> {
   return {
     email,
     name: getDisplayName(user, email),
-    userId,
+    userId: identity.userId,
   };
 }
 
@@ -256,12 +321,11 @@ function canProvisionConfiguredClient(identity: ClerkIdentity, client: Client): 
 }
 
 async function resolveActiveClientContext(): Promise<ActiveClientContext> {
-  const identity = await getClerkIdentity();
+  const sessionIdentity = await getClerkSessionIdentity();
   const supabase = createServiceRoleClient();
   const configuredClientId = getConfiguredClientId();
-  const normalizedIdentityEmail = normaliseEmail(identity.email);
 
-  const clerkLinkedClient = await loadClientByClerkUserId(supabase, identity.userId);
+  const clerkLinkedClient = await loadClientByClerkUserId(supabase, sessionIdentity.userId);
 
   if (clerkLinkedClient) {
     return {
@@ -269,6 +333,9 @@ async function resolveActiveClientContext(): Promise<ActiveClientContext> {
       client: clerkLinkedClient,
     };
   }
+
+  const identity = await getProvisioningIdentity(sessionIdentity);
+  const normalizedIdentityEmail = normaliseEmail(identity.email);
 
   const emailMatchedClient = await loadClientByEmail(supabase, identity.email);
 

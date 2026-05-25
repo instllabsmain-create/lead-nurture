@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Wordmark } from "@/components/ui/wordmark";
@@ -45,6 +45,17 @@ function getNavClassName(isActive: boolean): string {
   return "flex min-h-11 items-center rounded-md px-3 py-2 font-body text-sm text-dust transition-all duration-150 hover:bg-parchment hover:text-pitch active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 }
 
+function NavPendingHint() {
+  const { pending } = useLinkStatus();
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`h-1.5 w-1.5 shrink-0 rounded-full bg-saffron transition-opacity duration-150 ${pending ? "opacity-100" : "opacity-0"}`}
+    />
+  );
+}
+
 export function Sidebar({
   unreadCount,
   messagesSent,
@@ -77,14 +88,22 @@ export function Sidebar({
           const showBadge = item.label === "Inbox" && unreadCount && unreadCount > 0;
 
           return (
-            <Link key={item.href} href={item.href} className={getNavClassName(isActive)}>
-              <span className="flex items-center justify-between gap-2">
+            <Link
+              key={item.href}
+              href={item.href}
+              prefetch
+              className={getNavClassName(isActive)}
+            >
+              <span className="flex w-full items-center justify-between gap-2">
                 <span>{item.label}</span>
-                {showBadge ? (
-                  <span className="rounded-full bg-saffron px-1.5 py-0.5 font-mono text-[9px] text-white">
-                    {unreadCount}
-                  </span>
-                ) : null}
+                <span className="flex items-center gap-1.5">
+                  {showBadge ? (
+                    <span className="rounded-full bg-saffron px-1.5 py-0.5 font-mono text-[9px] text-white">
+                      {unreadCount}
+                    </span>
+                  ) : null}
+                  <NavPendingHint />
+                </span>
               </span>
             </Link>
           );
@@ -114,9 +133,13 @@ export function Sidebar({
 
         <Link
           href="/settings"
+          prefetch
           className={getNavClassName(isNavItemActive(pathname, "/settings"))}
         >
-          Settings
+          <span className="flex w-full items-center justify-between gap-2">
+            <span>Settings</span>
+            <NavPendingHint />
+          </span>
         </Link>
 
         <div className="flex items-center justify-between rounded-md border border-border bg-parchment px-3 py-2">
