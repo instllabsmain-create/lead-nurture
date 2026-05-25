@@ -28,6 +28,8 @@ export interface ConversationThreadMessage {
 interface ConversationThreadProps {
   lead: ConversationThreadLead;
   messages: ConversationThreadMessage[];
+  onConversationChange?: () => Promise<void> | void;
+  isRefreshing?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -113,6 +115,8 @@ function formatLastActive(value: string): string {
 export function ConversationThread({
   lead,
   messages,
+  onConversationChange,
+  isRefreshing = false,
 }: ConversationThreadProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const latestMessage = messages[messages.length - 1];
@@ -164,7 +168,7 @@ export function ConversationThread({
             </div>
 
             <div className="mt-1 font-mono text-[9px] uppercase tracking-[1.5px] text-dust">
-              Last active {formatLastActive(lead.lastActive)}
+              {isRefreshing ? "Refreshing..." : `Last active ${formatLastActive(lead.lastActive)}`}
             </div>
           </div>
         </div>
@@ -225,9 +229,10 @@ export function ConversationThread({
       <div className="border-t border-border bg-white p-4 lg:p-5">
         <div className="mx-auto w-full max-w-3xl">
           <MessageInput
-            key={`${lead.id}:${latestMessage?.id ?? "empty"}`}
+            key={lead.id}
             leadId={lead.id}
             aiPaused={lead.aiPaused}
+            onConversationChange={onConversationChange}
           />
         </div>
       </div>

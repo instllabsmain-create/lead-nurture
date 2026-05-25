@@ -8,6 +8,7 @@ import { buttonClassNames } from "@/components/ui/button";
 interface MessageInputProps {
   leadId: string;
   aiPaused: boolean;
+  onConversationChange?: () => Promise<void> | void;
 }
 
 interface SendMessageRequest {
@@ -38,12 +39,25 @@ function parseSendResponse(
   return { error: "Unexpected response from server" };
 }
 
-export function MessageInput({ leadId, aiPaused }: MessageInputProps) {
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export function MessageInput({
+  leadId,
+  aiPaused,
+  onConversationChange,
+}: MessageInputProps) {
   const [draft, setDraft] = useState("");
-  const [isAiHandling, setIsAiHandling] = useState(!aiPaused);
+  const [aiHandlingOverride, setAiHandlingOverride] = useState<boolean | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAiHandling = aiHandlingOverride ?? !aiPaused;
 
   async function toggleAi(paused: boolean) {
     setIsTogglingAi(true);
@@ -61,7 +75,12 @@ export function MessageInput({ leadId, aiPaused }: MessageInputProps) {
         throw new Error("Failed to update AI mode");
       }
 
-      setIsAiHandling(!paused);
+      setAiHandlingOverride(!paused);
+
+      if (onConversationChange) {
+        await onConversationChange();
+        setAiHandlingOverride(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update AI mode");
     } finally {
@@ -87,13 +106,14 @@ export function MessageInput({ leadId, aiPaused }: MessageInputProps) {
         body: JSON.stringify(payload),
       });
 
-      const result = parseSendResponse((await response.json()) as unknown);
+      const result = parseSendResponse(await readJson(response));
 
       if (!response.ok) {
         throw new Error("error" in result ? result.error : "Failed to send message");
       }
 
       setDraft("");
+      await onConversationChange?.();
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "Failed to send message");
     } finally {

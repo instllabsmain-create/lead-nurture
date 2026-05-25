@@ -8,6 +8,7 @@ create extension if not exists vector;
 create table if not exists public.clients (
   id                   uuid primary key default gen_random_uuid(),
   user_id              uuid references auth.users(id) on delete cascade unique,
+  clerk_user_id        text,
   name                 text not null,
   email                text unique not null,
   plan                 text default 'starter',
@@ -15,6 +16,9 @@ create table if not exists public.clients (
   config               jsonb default '{}',
   created_at           timestamptz default now()
 );
+
+alter table public.clients
+  add column if not exists clerk_user_id text;
 
 -- ── CHANNELS ─────────────────────────────────────────────────────────────────
 create table if not exists public.channels (
@@ -178,6 +182,9 @@ create index if not exists idx_messages_client_dir   on public.messages(client_i
 create index if not exists idx_followups_scheduled   on public.follow_ups(scheduled_at) where sent = false;
 create index if not exists idx_channels_account      on public.channels(account_id, type);
 create index if not exists idx_leads_agent           on public.leads(client_id, assigned_agent_id) where assigned_agent_id is not null;
+create unique index if not exists idx_clients_clerk_user_id
+  on public.clients(clerk_user_id)
+  where clerk_user_id is not null;
 
 -- ── WAITLIST (marketing site) ─────────────────────────────────────────────────
 create table if not exists public.waitlist (

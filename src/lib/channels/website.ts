@@ -10,6 +10,4 @@ export async function sendWebsiteMessage(
   void sessionId;
   void message;
   void clientId;
-
-  throw new Error("Website send adapter is not implemented yet");
 }

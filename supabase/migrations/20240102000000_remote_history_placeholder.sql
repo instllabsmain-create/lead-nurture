@@ -1,0 +1,3 @@
+-- Placeholder migration to align local history with the linked remote project.
+-- The remote database already records version 20240102000000 as applied, but the
+-- original SQL file is not present in this repository snapshot.

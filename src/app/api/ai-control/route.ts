@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getActiveClientContext } from "@/lib/active-client";
+import { resumeAiForLeadIfPending } from "@/lib/ai-resume";
 
 const schema = z.object({
   leadId: z.uuid(),
@@ -34,7 +35,15 @@ export async function PATCH(request: Request): Promise<Response> {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ ok: true });
+    const resumeResult = body.data.paused
+      ? { triggered: false }
+      : await resumeAiForLeadIfPending({
+          supabase,
+          clientId: client.id,
+          leadId: body.data.leadId,
+        });
+
+    return Response.json({ ok: true, resumed: resumeResult.triggered });
   } catch (error) {
     console.error(`AI control failed: ${getSafeErrorMessage(error)}`);
     return Response.json({ error: "Failed to update AI control" }, { status: 500 });

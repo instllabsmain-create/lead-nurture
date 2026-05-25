@@ -39,6 +39,10 @@ interface ChannelBadgeProps {
   channel: Platform;
 }
 
+const RECENT_LEAD_LIMIT = 5;
+const RECENT_MESSAGES_PER_LEAD = 4;
+const MIN_RECENT_MESSAGES = 20;
+
 const statusStyles: Record<LeadStatus, string> = {
   new: "bg-parchment text-dust",
   engaging: "bg-ember text-ember-text",
@@ -186,7 +190,7 @@ export default async function DashboardPage() {
       .select("id, name, handle, score, status, last_active")
       .eq("client_id", client.id)
       .order("last_active", { ascending: false })
-      .limit(5),
+      .limit(RECENT_LEAD_LIMIT),
   ]);
 
   const recentLeads = (recentLeadsResult.data ?? []) as RecentLeadRow[];
@@ -200,7 +204,8 @@ export default async function DashboardPage() {
       .select("lead_id, content, sent_at, channel")
       .eq("client_id", client.id)
       .in("lead_id", recentLeadIds)
-      .order("sent_at", { ascending: false });
+      .order("sent_at", { ascending: false })
+      .limit(Math.max(recentLeadIds.length * RECENT_MESSAGES_PER_LEAD, MIN_RECENT_MESSAGES));
 
     recentMessages = (recentMessagesResult.data ?? []) as RecentMessageRow[];
   }

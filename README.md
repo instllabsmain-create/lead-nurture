@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# INSTL Lead Nurture
 
-## Getting Started
+Production dashboard for capturing website and Meta leads, routing conversations into an operator inbox, and controlling AI follow-up by lead.
 
-First, run the development server:
+## Stack
 
-```bash
+- Next.js 16 App Router
+- React 19
+- Clerk authentication
+- Supabase data storage
+- Tailwind CSS 4
+
+## Local Development
+
+```sh
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Required Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set these before running production builds or deploys:
 
-## Learn More
+```sh
+NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+OPENAI_API_KEY=
+META_VERIFY_TOKEN=
+```
 
-To learn more about Next.js, take a look at the following resources:
+Optional settings:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+NEXT_PUBLIC_DEFAULT_CLIENT_ID=
+NEXT_PUBLIC_DEMO_SUBDOMAIN=demo
+ALLOW_SHARED_DEMO_CLIENT=
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Production Checks
 
-## Deploy on Vercel
+Run these before deploying:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```sh
+npm run lint
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app should not expose raw server errors to users, should keep generated agent artifacts out of commits, and should only ship after a clean production build.

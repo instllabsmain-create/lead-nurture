@@ -60,20 +60,44 @@ interface ChannelRow {
 
 interface LoadInboxDataArgs {
   selectedLeadId?: string;
+  redirectIfMissingLead?: boolean;
 }
 
-export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) {
+const CONVERSATION_LIST_LIMIT = 100;
+const RECENT_MESSAGES_PER_LEAD = 4;
+const MIN_RECENT_MESSAGES = 60;
+const THREAD_MESSAGE_LIMIT = 100;
+const CONVERSATION_LEAD_SELECT =
+  "id, client_id, channel_id, name, handle, score, status, assigned_agent_id, last_active, ai_paused";
+
+export async function loadInboxData({
+  selectedLeadId,
+  redirectIfMissingLead = true,
+}: LoadInboxDataArgs = {}) {
   const { supabase, client } = await getActiveClientContext();
 
   const { data: leadsData } = await supabase
     .from("leads")
-    .select(
-      "id, client_id, channel_id, name, handle, score, status, assigned_agent_id, last_active, ai_paused",
-    )
+    .select(CONVERSATION_LEAD_SELECT)
     .eq("client_id", client.id)
-    .order("last_active", { ascending: false });
+    .order("last_active", { ascending: false })
+    .limit(CONVERSATION_LIST_LIMIT);
 
-  const leads = (leadsData ?? []) as ConversationLeadRow[];
+  let leads = (leadsData ?? []) as ConversationLeadRow[];
+
+  if (selectedLeadId && !leads.some((lead) => lead.id === selectedLeadId)) {
+    const { data: selectedLeadData } = await supabase
+      .from("leads")
+      .select(CONVERSATION_LEAD_SELECT)
+      .eq("client_id", client.id)
+      .eq("id", selectedLeadId)
+      .maybeSingle();
+
+    if (selectedLeadData) {
+      leads = [selectedLeadData as ConversationLeadRow, ...leads];
+    }
+  }
+
   const leadIds = leads.map((lead) => lead.id);
   const channelIds = leads
     .map((lead) => lead.channel_id)
@@ -90,7 +114,7 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
         .eq("client_id", client.id)
         .in("lead_id", leadIds)
         .order("sent_at", { ascending: false })
-        .limit(Math.max(leadIds.length * 4, 60)),
+        .limit(Math.max(leadIds.length * RECENT_MESSAGES_PER_LEAD, MIN_RECENT_MESSAGES)),
       channelIds.length > 0
         ? supabase
             .from("channels")
@@ -146,7 +170,16 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId);
 
   if (!selectedLead) {
-    redirect("/inbox");
+    if (redirectIfMissingLead) {
+      redirect("/inbox");
+    }
+
+    return {
+      client,
+      conversations,
+      selectedLead: null,
+      messages: [],
+    };
   }
 
   const { data: selectedMessagesData } = await supabase
@@ -154,7 +187,8 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
     .select("id, direction, content, ai_generated, sent_at")
     .eq("client_id", client.id)
     .eq("lead_id", selectedLeadId)
-    .order("sent_at", { ascending: true });
+    .order("sent_at", { ascending: false })
+    .limit(THREAD_MESSAGE_LIMIT);
 
   const selectedChannel =
     selectedLead.channel_id ? channelTypeById.get(selectedLead.channel_id) ?? null : null;
@@ -173,10 +207,10 @@ export async function loadInboxData({ selectedLeadId }: LoadInboxDataArgs = {}) 
       channel: selectedChannel,
       aiPaused: selectedLead.ai_paused,
     },
-    messages: ((selectedMessagesData ?? []) as Pick<
+    messages: ([...((selectedMessagesData ?? []) as Pick<
       Message,
       "id" | "direction" | "content" | "ai_generated" | "sent_at"
-    >[]).map((message) => ({
+    >[])]).reverse().map((message) => ({
       id: message.id,
       direction: message.direction,
       content: message.content,

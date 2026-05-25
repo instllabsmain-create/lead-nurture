@@ -56,6 +56,9 @@ const statusOptions: StatusFilter[] = [
 
 const scoreOptions: ScoreBandFilter[] = ["all", "cold", "warm", "hot"];
 const assignmentOptions: AssignmentFilter[] = ["all", "assigned", "unassigned"];
+const LEADS_PAGE_LIMIT = 100;
+const RECENT_MESSAGES_PER_LEAD = 4;
+const MIN_RECENT_MESSAGES = 80;
 
 function parseStatusFilter(value: string | undefined): StatusFilter {
   return statusOptions.includes(value as StatusFilter) ? (value as StatusFilter) : "all";
@@ -145,7 +148,8 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
     .from("leads")
     .select("id, name, handle, score, status, last_active, assigned_agent_id, channel_id")
     .eq("client_id", client.id)
-    .order("last_active", { ascending: false });
+    .order("last_active", { ascending: false })
+    .limit(LEADS_PAGE_LIMIT);
 
   if (statusFilter !== "all") {
     leadsQuery = leadsQuery.eq("status", statusFilter);
@@ -193,7 +197,8 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         .select("lead_id, content, sent_at")
         .eq("client_id", client.id)
         .in("lead_id", leadIds)
-        .order("sent_at", { ascending: false }),
+        .order("sent_at", { ascending: false })
+        .limit(Math.max(leadIds.length * RECENT_MESSAGES_PER_LEAD, MIN_RECENT_MESSAGES)),
       assignedAgentIds.length > 0
         ? supabase
             .from("agents")

@@ -1,5 +1,6 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -38,10 +39,10 @@ function isNavItemActive(pathname: string, href: string): boolean {
 
 function getNavClassName(isActive: boolean): string {
   if (isActive) {
-    return "rounded-md bg-ember px-3 py-2 font-body text-sm font-medium text-ember-text transition-all duration-150";
+    return "flex min-h-11 items-center rounded-md bg-ember px-3 py-2 font-body text-sm font-medium text-ember-text transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
   }
 
-  return "rounded-md px-3 py-2 font-body text-sm text-dust transition-all duration-150 hover:bg-parchment hover:text-pitch active:scale-[0.98]";
+  return "flex min-h-11 items-center rounded-md px-3 py-2 font-body text-sm text-dust transition-all duration-150 hover:bg-parchment hover:text-pitch active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 }
 
 export function Sidebar({
@@ -62,12 +63,15 @@ export function Sidebar({
       : 0;
 
   return (
-    <aside className="flex h-screen w-[200px] shrink-0 flex-col border-r border-border bg-white px-4 py-5">
-      <div className="mb-8">
+    <aside className="flex w-full shrink-0 flex-col border-b border-border bg-white/95 px-4 py-4 shadow-[0_10px_28px_rgba(41,28,16,0.04)] lg:h-screen lg:w-[220px] lg:border-b-0 lg:border-r lg:py-5 lg:shadow-none">
+      <div className="mb-4 flex items-center justify-between gap-3 lg:mb-8 lg:block">
         <Wordmark />
+        <div className="lg:hidden">
+          <UserButton />
+        </div>
       </div>
 
-      <nav className="flex flex-col gap-1">
+      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:grid-cols-none lg:flex-col lg:gap-1">
         {NAV_ITEMS.map((item) => {
           const isActive = isNavItemActive(pathname, item.href);
           const showBadge = item.label === "Inbox" && unreadCount && unreadCount > 0;
@@ -87,7 +91,7 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-5 pt-6">
+      <div className="mt-4 hidden flex-col gap-5 border-t border-border pt-5 lg:mt-auto lg:flex">
         <div>
           <div className="mb-1.5 font-mono text-[8px] uppercase tracking-[2px] text-dust">
             Message usage
@@ -114,6 +118,13 @@ export function Sidebar({
         >
           Settings
         </Link>
+
+        <div className="flex items-center justify-between rounded-md border border-border bg-parchment px-3 py-2">
+          <span className="font-mono text-[9px] uppercase tracking-[1.5px] text-dust">
+            Account
+          </span>
+          <UserButton />
+        </div>
       </div>
     </aside>
   );

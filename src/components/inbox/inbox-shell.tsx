@@ -28,7 +28,13 @@ export function InboxShell({
   initialLead = null,
   initialMessages = [],
 }: InboxShellProps) {
-  const { conversations, selectedLead, messages } = useConversations({
+  const {
+    conversations,
+    selectedLead,
+    messages,
+    refresh: refreshConversations,
+    isRefreshing,
+  } = useConversations({
     clientId,
     initialConversations,
     activeLeadId,
@@ -45,7 +51,12 @@ export function InboxShell({
         />
 
         {selectedLead ? (
-          <ConversationThread lead={selectedLead} messages={messages} />
+          <ConversationThread
+            lead={selectedLead}
+            messages={messages}
+            onConversationChange={refreshConversations}
+            isRefreshing={isRefreshing}
+          />
         ) : (
           <div className="flex items-center justify-center border-t border-border bg-parchment p-6 lg:border-t-0">
             <Card>

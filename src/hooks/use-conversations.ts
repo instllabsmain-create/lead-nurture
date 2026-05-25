@@ -1,15 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { ConversationListItem } from "@/components/inbox/conversation-list";
 import type {
   ConversationThreadLead,
   ConversationThreadMessage,
 } from "@/components/inbox/conversation-thread";
-import { useRealtimeLeads, useRealtimeMessages } from "@/hooks/use-realtime";
-import { createClient } from "@/lib/supabase/client";
-import type { Lead, LeadStatus, Message, MessageContent } from "@/types";
 
 interface UseConversationsOptions {
   clientId: string;
@@ -23,90 +20,25 @@ interface UseConversationsResult {
   conversations: ConversationListItem[];
   selectedLead: ConversationThreadLead | null;
   messages: ConversationThreadMessage[];
+  refresh: () => Promise<void>;
+  isRefreshing: boolean;
 }
 
-interface LeadLookupRow {
-  id: string;
-  client_id: string;
-  name: string | null;
-  handle: string | null;
-  score: number;
-  status: LeadStatus;
-  assigned_agent_id: string | null;
-  last_active: string;
-  ai_paused: boolean;
+interface InboxSnapshot {
+  conversations: ConversationListItem[];
+  selectedLead: ConversationThreadLead | null;
+  messages: ConversationThreadMessage[];
 }
 
-function getConversationName(
-  name: string | null,
-  handle: string | null,
-): string {
-  return name?.trim() || handle?.trim() || "Unknown lead";
-}
+const POLL_INTERVAL_MS = 15000;
 
-function getMessagePreview(content: MessageContent): string {
-  const text = content.text?.trim();
-
-  if (text) {
-    return text;
+function getInboxSnapshotUrl(activeLeadId?: string): string {
+  if (!activeLeadId) {
+    return "/api/inbox";
   }
 
-  switch (content.type) {
-    case "image":
-      return "Image shared.";
-    case "audio":
-      return "Audio shared.";
-    default:
-      return "Message received.";
-  }
-}
-
-function sortConversations(
-  conversations: ConversationListItem[],
-): ConversationListItem[] {
-  return [...conversations].sort((left, right) => {
-    const leftTime = new Date(left.lastActive).getTime();
-    const rightTime = new Date(right.lastActive).getTime();
-
-    return rightTime - leftTime;
-  });
-}
-
-function upsertConversation(
-  conversations: ConversationListItem[],
-  nextConversation: ConversationListItem,
-): ConversationListItem[] {
-  const index = conversations.findIndex(
-    (conversation) => conversation.id === nextConversation.id,
-  );
-
-  if (index === -1) {
-    return sortConversations([...conversations, nextConversation]);
-  }
-
-  const updated = [...conversations];
-  updated[index] = {
-    ...updated[index],
-    ...nextConversation,
-  };
-
-  return sortConversations(updated);
-}
-
-function upsertThreadMessage(
-  messages: ConversationThreadMessage[],
-  nextMessage: ConversationThreadMessage,
-): ConversationThreadMessage[] {
-  if (messages.some((message) => message.id === nextMessage.id)) {
-    return messages;
-  }
-
-  return [...messages, nextMessage].sort((left, right) => {
-    const leftTime = new Date(left.sentAt).getTime();
-    const rightTime = new Date(right.sentAt).getTime();
-
-    return leftTime - rightTime;
-  });
+  const params = new URLSearchParams({ leadId: activeLeadId });
+  return `/api/inbox?${params.toString()}`;
 }
 
 export function useConversations({
@@ -116,152 +48,82 @@ export function useConversations({
   initialLead = null,
   initialMessages = [],
 }: UseConversationsOptions): UseConversationsResult {
-  const [supabase] = useState(() => createClient());
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedLead, setSelectedLead] = useState<ConversationThreadLead | null>(
     initialLead,
   );
   const [messages, setMessages] = useState(initialMessages);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [, startTransition] = useTransition();
+  const inFlightRequestRef = useRef<AbortController | null>(null);
 
-  async function hydrateConversationFromMessage(message: Message) {
-    const { data } = await supabase
-      .from("leads")
-      .select(
-        "id, client_id, name, handle, score, status, assigned_agent_id, last_active, ai_paused",
-      )
-      .eq("client_id", clientId)
-      .eq("id", message.lead_id)
-      .maybeSingle();
+  const refresh = useCallback(async () => {
+    inFlightRequestRef.current?.abort();
 
-    const lead = (data as LeadLookupRow | null) ?? null;
+    const controller = new AbortController();
+    inFlightRequestRef.current = controller;
+    setIsRefreshing(true);
 
-    if (!lead) {
-      return;
-    }
+    try {
+      const response = await fetch(getInboxSnapshotUrl(activeLeadId), {
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-    const nextConversation: ConversationListItem = {
-      id: lead.id,
-      name: lead.name,
-      handle: lead.handle,
-      score: lead.score,
-      status: lead.status,
-      assignedAgentId: lead.assigned_agent_id,
-      lastActive: lead.last_active,
-      preview: getMessagePreview(message.content),
-      channel: message.channel,
-      unread: message.direction === "inbound",
-    };
-
-    setConversations((current) => upsertConversation(current, nextConversation));
-
-    if (activeLeadId === lead.id) {
-      setSelectedLead((current) => ({
-        id: lead.id,
-        name: getConversationName(lead.name, lead.handle),
-        handle: lead.handle,
-        score: lead.score,
-        status: lead.status,
-        assignedAgentId: lead.assigned_agent_id,
-        lastActive: lead.last_active,
-        channel: current?.channel ?? message.channel,
-        aiPaused: (lead as LeadLookupRow).ai_paused ?? current?.aiPaused ?? false,
-      }));
-    }
-  }
-
-  function handleNewMessage(message: Message) {
-    const nextThreadMessage: ConversationThreadMessage = {
-      id: message.id,
-      direction: message.direction,
-      content: message.content,
-      aiGenerated: message.ai_generated,
-      sentAt: message.sent_at,
-    };
-
-    let hasConversation = false;
-
-    setConversations((current) => {
-      const existing = current.find(
-        (conversation) => conversation.id === message.lead_id,
-      );
-
-      if (!existing) {
-        return current;
+      if (!response.ok) {
+        return;
       }
 
-      hasConversation = true;
+      const snapshot = (await response.json()) as InboxSnapshot;
 
-      return upsertConversation(current, {
-        ...existing,
-        preview: getMessagePreview(message.content),
-        channel: message.channel,
-        lastActive: message.sent_at,
-        unread:
-          message.direction === "inbound" ? true : activeLeadId !== message.lead_id,
-      });
-    });
-
-    if (!hasConversation) {
-      void hydrateConversationFromMessage(message);
-    }
-
-    if (activeLeadId === message.lead_id) {
-      setMessages((current) => upsertThreadMessage(current, nextThreadMessage));
-      setSelectedLead((current) => {
-        if (!current) {
-          return current;
-        }
-
-        return {
-          ...current,
-          lastActive: message.sent_at,
-          channel: current.channel ?? message.channel,
-        };
-      });
-    }
-  }
-
-  function handleLeadUpdate(lead: Lead) {
-    setConversations((current) => {
-      const existing = current.find((conversation) => conversation.id === lead.id);
-
-      if (!existing) {
-        return current;
+      if (controller.signal.aborted) {
+        return;
       }
 
-      return upsertConversation(current, {
-        ...existing,
-        name: lead.name,
-        handle: lead.handle,
-        score: lead.score,
-        status: lead.status,
-        assignedAgentId: lead.assigned_agent_id,
-        lastActive: lead.last_active,
-        unread: existing.unread || lead.status === "new",
+      startTransition(() => {
+        setConversations(snapshot.conversations);
+        setSelectedLead(snapshot.selectedLead);
+        setMessages(snapshot.messages);
       });
-    });
-
-    if (activeLeadId === lead.id) {
-      setSelectedLead((current) => ({
-        id: lead.id,
-        name: getConversationName(lead.name, lead.handle),
-        handle: lead.handle,
-        score: lead.score,
-        status: lead.status,
-        assignedAgentId: lead.assigned_agent_id,
-        lastActive: lead.last_active,
-        channel: current?.channel ?? null,
-        aiPaused: lead.ai_paused,
-      }));
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        // Keep the current UI state if polling fails.
+      }
+    } finally {
+      if (inFlightRequestRef.current === controller) {
+        inFlightRequestRef.current = null;
+        setIsRefreshing(false);
+      }
     }
-  }
+  }, [activeLeadId]);
 
-  useRealtimeMessages(clientId, handleNewMessage);
-  useRealtimeLeads(clientId, handleLeadUpdate);
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }, POLL_INTERVAL_MS);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      inFlightRequestRef.current?.abort();
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [clientId, refresh]);
 
   return {
     conversations,
     selectedLead,
     messages,
+    refresh,
+    isRefreshing,
   };
 }

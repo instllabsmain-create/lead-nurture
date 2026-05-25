@@ -1,6 +1,13 @@
 @config "../../tailwind.config.ts";
 @import "tailwindcss";
 
+:root {
+  --font-display: "Barlow Condensed", "Avenir Next Condensed", "DIN Condensed",
+    "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", "Menlo", monospace;
+}
+
 html {
   min-height: 100%;
 }

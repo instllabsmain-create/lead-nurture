@@ -14,14 +14,13 @@ export default function BroadcastsPage() {
       </div>
 
       <Card>
-        <SectionLabel>Phase 2</SectionLabel>
+        <SectionLabel>Campaigns</SectionLabel>
         <h2 className="mt-3 font-display text-3xl font-black uppercase text-pitch">
-          Bulk campaigns are coming in Phase 2.
+          Campaign sending is not enabled yet.
         </h2>
         <p className="mt-3 max-w-2xl font-body text-sm leading-6 text-dust">
-          Broadcasts will let you send proactive messages to selected leads based
-          on audience rules, channel availability, and campaign timing. This page
-          is intentionally a placeholder until the Phase 2 campaign flow is built.
+          Keep this section off until campaign rules, consent checks, and
+          channel throttling are ready. Use Inbox and Leads for manual follow-up today.
         </p>
       </Card>
     </div>

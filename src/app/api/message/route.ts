@@ -10,10 +10,11 @@ import { notifyAgent, notifyClient } from "@/lib/notify";
 import { scheduleFollowUp } from "@/lib/queue";
 import { scoreLead } from "@/lib/score";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { ensureWebsiteChannel } from "@/lib/website-widget";
 import type { Channel, Client, KnowledgeBase, Lead, LeadStatus, Message, NormalisedMessage } from "@/types";
 
 const normalisedMessageSchema = z.object({
-  client_id: z.uuid().optional(),
+  client_id: z.string().trim().min(1).optional(),
   channel: z.enum(["instagram", "whatsapp", "facebook", "website"]),
   direction: z.literal("inbound"),
   from: z.object({
@@ -165,6 +166,32 @@ async function loadKnowledgeBase(
   }
 
   return (data ?? []) as KnowledgeBase[];
+}
+
+async function loadInboundChannel(
+  supabase: ServiceRoleClient,
+  normalised: NormalisedMessage,
+): Promise<Channel | null> {
+  const { data, error } = await supabase
+    .from("channels")
+    .select("id, client_id, type, account_id, account_name, access_token, status, connected_at")
+    .eq("account_id", normalised.to.id)
+    .eq("type", normalised.channel)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Channel lookup failed: ${error.message}`);
+  }
+
+  if (data) {
+    return data as Channel;
+  }
+
+  if (normalised.channel !== "website") {
+    return null;
+  }
+
+  return ensureWebsiteChannel(supabase, normalised.client_id ?? normalised.to.id);
 }
 
 async function saveOutboundMessage(
@@ -386,17 +413,10 @@ export async function POST(request: Request) {
     }
 
     const supabase = createServiceRoleClient();
-    const { data: channelData, error: channelError } = await supabase
-      .from("channels")
-      .select("id, client_id, type, account_id, account_name, access_token, status, connected_at")
-      .eq("account_id", normalised.to.id)
-      .eq("type", normalised.channel)
-      .maybeSingle();
-
-    if (channelError) {
-      console.error(`Channel lookup failed: ${channelError.message}`);
-      return Response.json({ ok: true });
-    }
+    const channelData = await loadInboundChannel(supabase, normalised).catch((error) => {
+      console.error(getSafeErrorMessage(error));
+      return null;
+    });
 
     if (!channelData) {
       console.error(`Channel not found for ${normalised.channel} account ${normalised.to.id}`);

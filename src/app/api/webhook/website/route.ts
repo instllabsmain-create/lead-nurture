@@ -3,10 +3,15 @@ import { z } from "zod";
 
 import { normaliseWebsite } from "@/lib/normalise";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import {
+  buildWebsiteOptionsResponse,
+  ensureWebsiteChannel,
+  withWebsiteCors,
+} from "@/lib/website-widget";
 
 const websiteWebhookSchema = z.object({
   session_id: z.string().trim().min(1),
-  client_id: z.uuid(),
+  client_id: z.string().trim().min(1),
   name: z.string().trim().min(1).optional(),
   message: z.string().trim().min(1),
 });
@@ -68,14 +73,17 @@ export async function POST(request: Request) {
     const exists = await clientExists(payload.data.client_id);
 
     if (!exists) {
-      return Response.json(
+      return withWebsiteCors(Response.json(
         {
           ok: false,
           error: "Unknown client_id",
         },
         { status: 404 },
-      );
+      ));
     }
+
+    const supabase = createServiceRoleClient();
+    await ensureWebsiteChannel(supabase, payload.data.client_id);
 
     const normalised = normaliseWebsite(payload.data, payload.data.client_id);
 
@@ -87,18 +95,22 @@ export async function POST(request: Request) {
       }),
     );
 
-    return Response.json({ ok: true });
+    return withWebsiteCors(Response.json({ ok: true }));
   } catch (error) {
     console.error(
       `Failed to process website webhook: ${getSafeErrorMessage(error)}`,
     );
 
-    return Response.json(
+    return withWebsiteCors(Response.json(
       {
         ok: false,
         error: "Invalid request body",
       },
       { status: 400 },
-    );
+    ));
   }
+}
+
+export function OPTIONS() {
+  return buildWebsiteOptionsResponse();
 }

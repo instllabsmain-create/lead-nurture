@@ -44,25 +44,6 @@ function getRequiredArray(
   return value;
 }
 
-function getRequiredArrayItem(
-  source: Record<string, unknown>,
-  key: string,
-  index: number,
-  channel: Platform,
-  path: string,
-): Record<string, unknown> {
-  const items = getRequiredArray(source, key, channel, path);
-  const value = items[index];
-
-  if (!isRecord(value)) {
-    throw new Error(
-      `Invalid ${channel} payload: expected object at ${path}.${key}[${index}]`,
-    );
-  }
-
-  return value;
-}
-
 function getOptionalArrayItem(
   source: Record<string, unknown>,
   key: string,

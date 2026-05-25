@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 
 import { CopyButton } from "@/components/channels/copy-button";
@@ -6,6 +7,7 @@ import { buttonClassNames } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getActiveClientContext } from "@/lib/active-client";
+import { ensureWebsiteChannel } from "@/lib/website-widget";
 import type { Channel, Platform } from "@/types";
 
 type ChannelRow = Pick<
@@ -187,6 +189,7 @@ function renderConnectionBadge(status: Channel["status"] | "ready") {
 
 export default async function ChannelsPage() {
   const { supabase, clientId } = await loadClientContext();
+  await ensureWebsiteChannel(supabase, clientId);
   const { data } = await supabase
     .from("channels")
     .select("id, type, account_id, account_name, status, connected_at")
@@ -201,14 +204,21 @@ export default async function ChannelsPage() {
   const whatsappChannel = channelMap.get("whatsapp") ?? null;
   const websiteChannel = channelMap.get("website") ?? null;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
-  const webhookUrl = appUrl
-    ? `${appUrl}/api/webhook/whatsapp`
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const protocol = requestHeaders.get("x-forwarded-proto")
+    ?? (host?.includes("localhost") ? "http" : "https");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || (host ? `${protocol}://${host}` : "");
+  const normalisedAppUrl = appUrl.replace(/\/$/, "");
+  const webhookUrl = normalisedAppUrl
+    ? `${normalisedAppUrl}/api/webhook/whatsapp`
     : "Set NEXT_PUBLIC_APP_URL to generate webhook URL";
   const verifyTokenDisplay = process.env.META_VERIFY_TOKEN?.trim()
     ? "Configured in environment"
     : "Set META_VERIFY_TOKEN in environment";
-  const embedCode = `<script src="/widget.js" data-client="${clientId}"></script>`;
+  const embedCode = normalisedAppUrl
+    ? `<script src="${normalisedAppUrl}/widget.js" data-client="${clientId}" defer></script>`
+    : "Set NEXT_PUBLIC_APP_URL to generate widget embed code";
 
   return (
     <div className="flex flex-col gap-6 p-8 sm:p-10">
@@ -274,10 +284,10 @@ export default async function ChannelsPage() {
             ) : (
               <div className="mt-5">
                 <button type="button" disabled className={buttonClassNames.secondary}>
-                  Connect with Meta
+                  Meta OAuth coming soon
                 </button>
                 <div className="mt-2 font-mono text-[9px] uppercase tracking-[1.5px] text-dust">
-                  OAuth placeholder
+                  Manual Meta setup is not enabled in this build
                 </div>
               </div>
             )}
@@ -326,10 +336,10 @@ export default async function ChannelsPage() {
             ) : (
               <div className="mt-5">
                 <button type="button" disabled className={buttonClassNames.secondary}>
-                  Connect with Meta
+                  Meta OAuth coming soon
                 </button>
                 <div className="mt-2 font-mono text-[9px] uppercase tracking-[1.5px] text-dust">
-                  OAuth placeholder
+                  Manual Meta setup is not enabled in this build
                 </div>
               </div>
             )}
